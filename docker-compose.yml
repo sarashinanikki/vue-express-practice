@@ -1,0 +1,64 @@
+version: '3.8'
+services:
+    # Vue.jsが動くコンテナイメージについて
+    front:
+        # 詳細な設定は./fron/Dockerfile の中に書いているので、それを読んでねと教えてあげる
+        build:
+            context: ./front
+            dockerfile: Dockerfile
+        command: sh -c "npm install && npm run serve"
+        ports:
+            - '8080:8080'
+        # ./front直下の中身は全部、Vue.jsが動くコンテナの/appディレクトリ直下に同期してね
+        volumes:
+            - './front:/app'
+        # これを書かないとフロントの場合動かないことがあるのでおまじない(ちゃんとしたことは知らないけど、多分大した理由じゃなさそう)
+        stdin_open: true
+    back:
+        build:
+            context: ./back
+            dockerfile: Dockerfile
+        command: sh -c "npm install && npm run serve"
+        ports:
+            - '3000:3000'
+        volumes:
+            - './back:/app'
+        stdin_open: true
+        env_file: .env
+
+    # DB(PostgreSQL)が動くコンテナイメージについて
+    db:
+        # このコンテナについては特にDockerfileとかないから、Docker Hubにアップロードされている公式イメージをそのままダウンロードしてきてねと教えてあげる
+        image: postgres:latest
+
+        # 何か突然落ちたりしたらいつでもすぐに再起動してね
+        restart: always
+
+        # このPCのポート番号:コンテナのポート番号 で繋がっている状態にしてね
+        ports: 
+            - "5432:5432"
+
+        # ./db直下の中身は全部、postgres が動くコンテナの/var/lib/postgresql/dataディレクトリ直下に同期してね
+        # 実はコンテナというのは、シャットダウンすると中のデータは全部消える。つまりDBコンテナをシャットダウンするとDBのデータも消えてしまう。
+        # それは不便なので、シャットダウンしてもデータを永続化したい
+        # postgresのデータはデフォルトだと/var/lib/postgresql/dataに入っているので、ここを同期しておくとコンテナ削除後もデータを./dbに残しておける
+        volumes:
+            - ./db:/var/lib/postgresql/data
+
+        # 色々なDBの設定。ただしここでパスワードなどの設定までしてしまうとセキュリティ的にまずいので、今回はやらない(やろうと思えばできてしまう)
+        environment: 
+            # time zone = Tokyo
+            TZ: "Asia/Tokyo"
+
+        # .envファイルにはpostgresのユーザー名やパスワードを書き込んでおく。ただしこの.envファイルはGitで管理せず、GitHubにも上がらないようにする
+        # こうすることでセキュリティの問題をクリアしながらパスワードやユーザー名を設定できる
+        env_file: .env
+    
+# 以下参考文献
+# docker-composeの書き方(サンプルコードとかある。これを雛形にした) https://qiita.com/yuta-ushijima/items/d3d98177e1b28f736f04
+# docker-composeの公式リファレンス  https://y-ohgi.com/introduction-docker/3_production/docker-compose/
+# VueのDocker環境作成の記事 https://qiita.com/yuta-38/items/293c6de7760393bc84d7
+# VueのDocker環境作成の記事  https://qiita.com/A-Kira/items/ed12de84dda0230a4eae
+# DBについて(永続化とか初期化とか)  https://qiita.com/juhn/items/274e44ee80354a39d872
+# DBについて(永続化とか初期化とか)  https://qiita.com/A-Kira/items/f401aea261693c395966
+# DBについて(環境変数を.envで渡す)  https://qiita.com/yuta0601/items/fc79a27338d52f6a2a0e
